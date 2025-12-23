@@ -1,45 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Match } from '@/types/match';
-import { getLiveMatches } from '@/data/mockData';
+import { fetchLiveMatches } from '@/services/matchApi';
 
 const REFRESH_INTERVAL = 15000; // 15 seconds
 
 export const useLiveMatches = () => {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  const fetchMatches = useCallback(async () => {
-    try {
-      // Simulate API call with mock data
-      const liveMatches = getLiveMatches();
-      
-      // Simulate some score changes randomly for demo
-      const updatedMatches = liveMatches.map(match => {
-        if (match.status === 'LIVE' && Math.random() > 0.8) {
-          return {
-            ...match,
-            minute: Math.min((match.minute || 0) + 1, 90),
-          };
-        }
-        return match;
-      });
-      
-      setMatches(updatedMatches);
+  const { data: matches = [], isLoading, refetch } = useQuery({
+    queryKey: ['liveMatches'],
+    queryFn: async () => {
+      const result = await fetchLiveMatches();
       setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Failed to fetch live matches:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      return result;
+    },
+    refetchInterval: REFRESH_INTERVAL,
+    staleTime: REFRESH_INTERVAL - 1000,
+  });
 
-  useEffect(() => {
-    fetchMatches();
-    
-    const interval = setInterval(fetchMatches, REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchMatches]);
-
-  return { matches, isLoading, lastUpdated, refetch: fetchMatches };
+  return { matches, isLoading, lastUpdated, refetch };
 };

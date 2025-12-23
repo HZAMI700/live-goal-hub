@@ -28,7 +28,7 @@ const Live = () => {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={refetch}
+            onClick={() => refetch()}
             disabled={isLoading}
             className="rounded-full"
           >

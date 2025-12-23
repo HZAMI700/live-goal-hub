@@ -1,0 +1,4 @@
+project_id = "vrbipcwunrlbfpumnroh"
+
+[functions.matches]
+verify_jwt = false
