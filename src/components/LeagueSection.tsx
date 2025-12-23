@@ -24,6 +24,9 @@ export const LeagueSection = forwardRef<HTMLDivElement, LeagueSectionProps>(
             src={league.logo} 
             alt={league.name}
             className="w-8 h-8 rounded-lg"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(league.name.substring(0, 2)) + '&background=22c55e&color=0a0c10&size=64&rounded=true';
+            }}
           />
           <div className="flex-1">
             <div className="flex items-center gap-2">
