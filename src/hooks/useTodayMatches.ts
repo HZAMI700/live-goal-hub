@@ -1,27 +1,22 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { League } from "@/types/match";
-import {
-  fetchScraperLeagues,
-  checkScraperHealth,
-  getScraperStatus,
-} from "@/services/scraperApi";
-import { topLeagues, otherLeagues } from "@/data/mockData";
+import { fetchTodayMatches, checkApiHealth, getApiStatus } from "@/services/sportsApi";
 
-const REFRESH_INTERVAL = 60000; // 60 seconds for today matches
+const REFRESH_INTERVAL = 60000; // 60 seconds
 
-export const useTodayMatches = () => {
+export const useTodayMatches = (date?: string) => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [scraperOnline, setScraperOnline] = useState<boolean | null>(null);
-  const [isWaking, setIsWaking] = useState(false);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Check scraper health on mount
+  // Check API health on mount
   useEffect(() => {
     const checkHealth = async () => {
-      setIsWaking(true);
-      const health = await checkScraperHealth();
-      setScraperOnline(health.online);
-      setIsWaking(false);
+      setIsInitializing(true);
+      const health = await checkApiHealth();
+      setApiOnline(health.online);
+      setIsInitializing(false);
     };
     checkHealth();
   }, []);
@@ -32,49 +27,19 @@ export const useTodayMatches = () => {
     refetch,
     isError,
   } = useQuery({
-    queryKey: ["todayMatches"],
+    queryKey: ["todayMatches", date],
     queryFn: async () => {
       try {
-        const leagues = await fetchScraperLeagues();
+        const result = await fetchTodayMatches(date);
         setLastUpdated(new Date());
         
-        if (leagues.length > 0) {
-          setScraperOnline(true);
-          
-          // Separate into top leagues and others
-          const topLeagueNames = [
-            "premier league",
-            "la liga",
-            "bundesliga",
-            "serie a",
-            "ligue 1",
-            "champions league",
-            "europa league",
-          ];
-          
-          const top = leagues.filter((l) =>
-            topLeagueNames.some((name) => l.name.toLowerCase().includes(name))
-          );
-          const other = leagues.filter(
-            (l) => !topLeagueNames.some((name) => l.name.toLowerCase().includes(name))
-          );
-          
-          return { topLeagues: top, otherLeagues: other };
-        }
+        const status = getApiStatus();
+        setApiOnline(status === "online");
         
-        // Check status
-        const status = getScraperStatus();
-        if (status === "online") {
-          setScraperOnline(true);
-          return { topLeagues: [], otherLeagues: [] };
-        }
-        
-        // Use mock data as fallback
-        setScraperOnline(false);
-        return { topLeagues, otherLeagues };
+        return result;
       } catch (error) {
-        setScraperOnline(false);
-        return { topLeagues, otherLeagues };
+        setApiOnline(false);
+        return { topLeagues: [], otherLeagues: [] };
       }
     },
     refetchInterval: REFRESH_INTERVAL,
@@ -84,13 +49,13 @@ export const useTodayMatches = () => {
   });
 
   return {
-    topLeagues: data?.topLeagues ?? topLeagues,
-    otherLeagues: data?.otherLeagues ?? otherLeagues,
-    isLoading: isLoading || isWaking,
+    topLeagues: data?.topLeagues ?? [],
+    otherLeagues: data?.otherLeagues ?? [],
+    isLoading: isLoading || isInitializing,
     lastUpdated,
     refetch,
     isError,
-    scraperOnline,
-    isWaking,
+    apiOnline,
+    isInitializing,
   };
 };

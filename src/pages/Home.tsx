@@ -7,13 +7,15 @@ import { Zap, AlertCircle, RefreshCw, Loader2, Wifi, WifiOff } from "lucide-reac
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
 
 const Home = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const navigate = useNavigate();
 
-  const { topLeagues, otherLeagues, isLoading, isError, scraperOnline, isWaking, refetch } =
-    useTodayMatches();
+  const dateStr = format(selectedDate, "yyyy-MM-dd");
+  const { topLeagues, otherLeagues, isLoading, isError, apiOnline, isInitializing, refetch } =
+    useTodayMatches(dateStr);
 
   const liveCount = [...topLeagues, ...otherLeagues]
     .flatMap((l) => l.matches)
@@ -24,17 +26,17 @@ const Home = () => {
       <Header title="LiveScore" />
 
       {/* Connection Status */}
-      {isWaking && (
+      {isInitializing && (
         <div className="mx-4 mt-2 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-2 text-sm text-primary">
           <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
-          <span>Waking up server... This may take 30-60 seconds.</span>
+          <span>Connecting to live data...</span>
         </div>
       )}
 
-      {!isWaking && scraperOnline === false && (
+      {!isInitializing && apiOnline === false && (
         <div className="mx-4 mt-2 p-3 bg-muted rounded-lg flex items-center gap-2 text-sm text-muted-foreground">
           <WifiOff className="w-4 h-4 shrink-0" />
-          <span>Scraper offline. Using demo data.</span>
+          <span>API offline. Check connection.</span>
           <Button variant="ghost" size="sm" onClick={() => refetch()} className="ml-auto">
             <RefreshCw className="w-3 h-3 mr-1" />
             Retry
@@ -42,10 +44,10 @@ const Home = () => {
         </div>
       )}
 
-      {!isWaking && scraperOnline === true && (
+      {!isInitializing && apiOnline === true && (
         <div className="mx-4 mt-2 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-2 text-sm text-primary">
           <Wifi className="w-4 h-4 shrink-0" />
-          <span>Live data connected</span>
+          <span>Live data connected via TheSportsDB</span>
         </div>
       )}
 
@@ -124,14 +126,14 @@ const Home = () => {
           )}
 
           {/* Empty State */}
-          {topLeagues.length === 0 && otherLeagues.length === 0 && (
+          {topLeagues.length === 0 && otherLeagues.length === 0 && !isLoading && (
             <div className="text-center py-16">
               <Zap className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-20" />
               <h3 className="text-lg font-semibold text-muted-foreground">
-                No matches today
+                No matches for this date
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Check back later for upcoming matches
+                Try selecting a different date
               </p>
             </div>
           )}

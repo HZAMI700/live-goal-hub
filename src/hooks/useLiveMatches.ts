@@ -1,35 +1,23 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Match } from "@/types/match";
-import {
-  fetchScraperLive,
-  checkScraperHealth,
-  getScraperStatus,
-} from "@/services/scraperApi";
-import { topLeagues, otherLeagues } from "@/data/mockData";
+import { fetchLiveMatches, checkApiHealth, getApiStatus } from "@/services/sportsApi";
 
-const REFRESH_INTERVAL = 15000; // 15 seconds
-
-// Get mock live matches for fallback
-const getMockLiveMatches = (): Match[] => {
-  return [...topLeagues, ...otherLeagues]
-    .flatMap((l) => l.matches)
-    .filter((m) => m.status === "LIVE" || m.status === "HT");
-};
+const REFRESH_INTERVAL = 30000; // 30 seconds
 
 export const useLiveMatches = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isUpdating, setIsUpdating] = useState(false);
-  const [scraperOnline, setScraperOnline] = useState<boolean | null>(null);
-  const [isWaking, setIsWaking] = useState(false);
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Check scraper health on mount
+  // Check API health on mount
   useEffect(() => {
     const checkHealth = async () => {
-      setIsWaking(true);
-      const health = await checkScraperHealth();
-      setScraperOnline(health.online);
-      setIsWaking(false);
+      setIsInitializing(true);
+      const health = await checkApiHealth();
+      setApiOnline(health.online);
+      setIsInitializing(false);
     };
     checkHealth();
   }, []);
@@ -44,34 +32,22 @@ export const useLiveMatches = () => {
     queryFn: async () => {
       setIsUpdating(true);
       try {
-        const result = await fetchScraperLive();
+        const result = await fetchLiveMatches();
         setLastUpdated(new Date());
         
-        // Check if we got real data
-        if (result.length > 0) {
-          setScraperOnline(true);
-          return result;
-        }
+        const status = getApiStatus();
+        setApiOnline(status === "online");
         
-        // If no live matches from scraper, check if it's online
-        const status = getScraperStatus();
-        if (status === "online") {
-          setScraperOnline(true);
-          return result; // Empty but valid
-        }
-        
-        // Scraper offline, use mock data
-        setScraperOnline(false);
-        return getMockLiveMatches();
+        return result;
       } catch (error) {
-        setScraperOnline(false);
-        return getMockLiveMatches();
+        setApiOnline(false);
+        return [];
       } finally {
         setIsUpdating(false);
       }
     },
     refetchInterval: REFRESH_INTERVAL,
-    staleTime: REFRESH_INTERVAL - 1000,
+    staleTime: REFRESH_INTERVAL - 5000,
     retry: 2,
     retryDelay: 5000,
   });
@@ -82,11 +58,11 @@ export const useLiveMatches = () => {
 
   return {
     matches,
-    isLoading: isLoading || isUpdating || isWaking,
+    isLoading: isLoading || isUpdating || isInitializing,
     lastUpdated,
     refetch: manualRefresh,
     isError,
-    scraperOnline,
-    isWaking,
+    apiOnline,
+    isInitializing,
   };
 };

@@ -1,23 +1,56 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMatchDetails } from '@/data/mockData';
+import { useMatchDetails } from '@/hooks/useMatchDetails';
 import { LiveIndicator } from '@/components/LiveIndicator';
 import { MatchStats } from '@/components/MatchStats';
 import { MatchEvents } from '@/components/MatchEvents';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, MapPin, User, Users } from 'lucide-react';
+import { ChevronLeft, MapPin, User, Users, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const MatchDetail = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   
-  const match = matchId ? getMatchDetails(matchId) : null;
+  const { match, isLoading, isError } = useMatchDetails(matchId);
 
-  if (!match) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen pb-24">
+        <header className="sticky top-0 z-50 glass border-b border-border">
+          <div className="container flex items-center h-14 px-4 gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate(-1)}
+              className="rounded-full"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </header>
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-20 w-20 rounded-2xl" />
+            <Skeleton className="h-12 w-24" />
+            <Skeleton className="h-20 w-20 rounded-2xl" />
+          </div>
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !match) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">Match not found</p>
+        <Button variant="outline" onClick={() => navigate(-1)}>
+          Go Back
+        </Button>
       </div>
     );
   }
@@ -43,6 +76,9 @@ const MatchDetail = () => {
               src={match.league.logo} 
               alt={match.league.name}
               className="w-6 h-6 rounded"
+              onError={(e) => {
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(match.league.name.substring(0, 2))}&background=22c55e&color=0a0c10&size=64&rounded=true`;
+              }}
             />
             <span className="text-sm text-muted-foreground">{match.league.name}</span>
           </div>
@@ -58,6 +94,9 @@ const MatchDetail = () => {
               src={match.homeTeam.logo}
               alt={match.homeTeam.name}
               className="w-20 h-20 object-contain bg-secondary/50 p-2 rounded-2xl"
+              onError={(e) => {
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(match.homeTeam.name)}&background=1a1f2e&color=22c55e&bold=true&size=64`;
+              }}
             />
             <span className="font-semibold text-sm">{match.homeTeam.name}</span>
           </div>
@@ -81,14 +120,14 @@ const MatchDetail = () => {
                     'text-5xl font-extrabold',
                     isLive && 'text-foreground'
                   )}>
-                    {match.homeScore}
+                    {match.homeScore ?? 0}
                   </span>
                   <span className="text-2xl text-muted-foreground">-</span>
                   <span className={cn(
                     'text-5xl font-extrabold',
                     isLive && 'text-foreground'
                   )}>
-                    {match.awayScore}
+                    {match.awayScore ?? 0}
                   </span>
                 </div>
                 <LiveIndicator 
@@ -105,21 +144,28 @@ const MatchDetail = () => {
               src={match.awayTeam.logo}
               alt={match.awayTeam.name}
               className="w-20 h-20 object-contain bg-secondary/50 p-2 rounded-2xl"
+              onError={(e) => {
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(match.awayTeam.name)}&background=1a1f2e&color=22c55e&bold=true&size=64`;
+              }}
             />
             <span className="font-semibold text-sm">{match.awayTeam.name}</span>
           </div>
         </div>
 
         {/* Match Info */}
-        <div className="flex justify-center gap-6 mt-6 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>{match.venue}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <User className="w-3.5 h-3.5" />
-            <span>{match.referee}</span>
-          </div>
+        <div className="flex justify-center gap-6 mt-6 text-xs text-muted-foreground flex-wrap">
+          {match.venue && (
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>{match.venue}</span>
+            </div>
+          )}
+          {match.referee && match.referee !== "TBA" && (
+            <div className="flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5" />
+              <span>{match.referee}</span>
+            </div>
+          )}
           {match.attendance && (
             <div className="flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" />
@@ -138,11 +184,23 @@ const MatchDetail = () => {
           </TabsList>
           
           <TabsContent value="events" className="mt-4">
-            <MatchEvents events={match.events} />
+            {match.events && match.events.length > 0 ? (
+              <MatchEvents events={match.events} />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No events recorded yet
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="stats" className="mt-4">
-            {match.stats && <MatchStats stats={match.stats} />}
+            {match.stats ? (
+              <MatchStats stats={match.stats} />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Statistics not available
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       )}

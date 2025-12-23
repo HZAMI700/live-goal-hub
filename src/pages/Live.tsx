@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
 const Live = () => {
-  const { matches, isLoading, lastUpdated, refetch, isError, scraperOnline, isWaking } =
+  const { matches, isLoading, lastUpdated, refetch, isError, apiOnline, isInitializing } =
     useLiveMatches();
 
   return (
@@ -21,19 +21,19 @@ const Live = () => {
           <span className="font-semibold">
             {matches.length} Live {matches.length === 1 ? "Match" : "Matches"}
           </span>
-          {isWaking && (
+          {isInitializing && (
             <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
               <Loader2 className="w-3 h-3 animate-spin" />
-              Waking
+              Connecting
             </span>
           )}
-          {!isWaking && scraperOnline === false && (
+          {!isInitializing && apiOnline === false && (
             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded flex items-center gap-1">
               <WifiOff className="w-3 h-3" />
-              Demo
+              Offline
             </span>
           )}
-          {!isWaking && scraperOnline === true && (
+          {!isInitializing && apiOnline === true && (
             <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
               <Wifi className="w-3 h-3" />
               Live
@@ -64,19 +64,19 @@ const Live = () => {
         </div>
       </div>
 
-      {/* Waking Banner */}
-      {isWaking && (
+      {/* Connecting Banner */}
+      {isInitializing && (
         <div className="mx-4 mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center gap-2 text-sm text-primary">
           <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
-          <span>Waking up server... Please wait 30-60 seconds.</span>
+          <span>Connecting to live data...</span>
         </div>
       )}
 
       {/* Error Banner */}
-      {isError && !isWaking && (
+      {isError && !isInitializing && (
         <div className="mx-4 mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-sm text-destructive">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>Connection issue. Showing last known data.</span>
+          <span>Connection issue. Please try again.</span>
         </div>
       )}
 
@@ -111,14 +111,14 @@ const Live = () => {
       )}
 
       {/* Auto-refresh indicator */}
-      {matches.length > 0 && !isError && scraperOnline && (
+      {matches.length > 0 && !isError && apiOnline && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2">
           <div className="bg-secondary/90 backdrop-blur-sm px-4 py-2 rounded-full text-xs text-muted-foreground flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
-            Auto-refreshing every 15s
+            Auto-refreshing every 30s
           </div>
         </div>
       )}
