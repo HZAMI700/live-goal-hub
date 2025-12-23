@@ -29,9 +29,13 @@ serve(async (req) => {
       });
     }
 
-    // Fetch live soccer scores
+    // Free tier doesn't have live scores endpoint, so we fetch today's matches
+    // and filter for matches that might be in progress based on scores
+    const today = new Date().toISOString().split('T')[0];
+    console.log(`Fetching today's matches for date: ${today}`);
+    
     const response = await fetch(
-      `${BASE_URL}/${API_KEY}/livescore.php?s=Soccer`
+      `${BASE_URL}/${API_KEY}/eventsday.php?d=${today}&s=Soccer`
     );
 
     if (!response.ok) {
@@ -39,9 +43,21 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log(`Received ${data.events?.length || 0} events for today`);
     
-    // Transform to our app format
-    const matches = (data.events || []).map((event: any) => ({
+    // Filter and transform matches - look for matches with scores (indicating they've started)
+    const allMatches = data.events || [];
+    const liveMatches = allMatches.filter((event: any) => {
+      // Consider a match "live" if it has scores but isn't marked as finished
+      const hasScores = event.intHomeScore !== null && event.intAwayScore !== null;
+      const status = (event.strStatus || "").toLowerCase();
+      const isFinished = status.includes("ft") || status.includes("finished") || status.includes("aet") || status.includes("pen");
+      return hasScores && !isFinished;
+    });
+
+    console.log(`Found ${liveMatches.length} potential live matches`);
+
+    const matches = liveMatches.map((event: any) => ({
       id: event.idEvent,
       homeTeam: {
         id: event.idHomeTeam || event.strHomeTeam?.replace(/\s/g, '-').toLowerCase(),
@@ -71,6 +87,7 @@ serve(async (req) => {
       count: matches.length,
       timestamp: new Date().toISOString(),
       source: "thesportsdb",
+      note: "Live matches derived from today's events (free tier limitation)"
     };
 
     // Update cache
