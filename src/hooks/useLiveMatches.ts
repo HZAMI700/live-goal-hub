@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Match } from "@/types/match";
 import {
   fetchScraperLive,
-  isScraperConfigured,
+  checkScraperHealth,
+  getScraperStatus,
 } from "@/services/scraperApi";
 import { topLeagues, otherLeagues } from "@/data/mockData";
 
@@ -19,6 +20,19 @@ const getMockLiveMatches = (): Match[] => {
 export const useLiveMatches = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isUpdating, setIsUpdating] = useState(false);
+  const [scraperOnline, setScraperOnline] = useState<boolean | null>(null);
+  const [isWaking, setIsWaking] = useState(false);
+
+  // Check scraper health on mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      setIsWaking(true);
+      const health = await checkScraperHealth();
+      setScraperOnline(health.online);
+      setIsWaking(false);
+    };
+    checkHealth();
+  }, []);
 
   const {
     data: matches = [],
@@ -30,14 +44,27 @@ export const useLiveMatches = () => {
     queryFn: async () => {
       setIsUpdating(true);
       try {
-        // If scraper is configured, use it
-        if (isScraperConfigured()) {
-          const result = await fetchScraperLive();
-          setLastUpdated(new Date());
+        const result = await fetchScraperLive();
+        setLastUpdated(new Date());
+        
+        // Check if we got real data
+        if (result.length > 0) {
+          setScraperOnline(true);
           return result;
         }
-        // Otherwise use mock data
-        setLastUpdated(new Date());
+        
+        // If no live matches from scraper, check if it's online
+        const status = getScraperStatus();
+        if (status === "online") {
+          setScraperOnline(true);
+          return result; // Empty but valid
+        }
+        
+        // Scraper offline, use mock data
+        setScraperOnline(false);
+        return getMockLiveMatches();
+      } catch (error) {
+        setScraperOnline(false);
         return getMockLiveMatches();
       } finally {
         setIsUpdating(false);
@@ -46,7 +73,7 @@ export const useLiveMatches = () => {
     refetchInterval: REFRESH_INTERVAL,
     staleTime: REFRESH_INTERVAL - 1000,
     retry: 2,
-    retryDelay: 3000,
+    retryDelay: 5000,
   });
 
   const manualRefresh = useCallback(() => {
@@ -55,10 +82,11 @@ export const useLiveMatches = () => {
 
   return {
     matches,
-    isLoading: isLoading || isUpdating,
+    isLoading: isLoading || isUpdating || isWaking,
     lastUpdated,
     refetch: manualRefresh,
     isError,
-    isConfigured: isScraperConfigured(),
+    scraperOnline,
+    isWaking,
   };
 };
