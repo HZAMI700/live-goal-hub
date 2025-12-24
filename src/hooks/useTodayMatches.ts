@@ -5,7 +5,7 @@ import { fetchTodayMatches, checkApiHealth, getApiStatus } from "@/services/spor
 
 const REFRESH_INTERVAL = 60000; // 60 seconds
 
-export const useTodayMatches = (date?: string) => {
+export const useTodayMatches = (_date?: string) => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -27,10 +27,10 @@ export const useTodayMatches = (date?: string) => {
     refetch,
     isError,
   } = useQuery({
-    queryKey: ["todayMatches", date],
+    queryKey: ["todayMatches", _date],
     queryFn: async () => {
       try {
-        const result = await fetchTodayMatches(date);
+        const result = await fetchTodayMatches();
         setLastUpdated(new Date());
         
         const status = getApiStatus();

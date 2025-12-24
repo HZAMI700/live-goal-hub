@@ -1,19 +1,19 @@
 project_id = "vrbipcwunrlbfpumnroh"
 
-[functions.thesportsdb-live]
-verify_jwt = false
-
-[functions.thesportsdb-today]
-verify_jwt = false
-
-[functions.thesportsdb-leagues]
-verify_jwt = false
-
-[functions.thesportsdb-match]
-verify_jwt = false
-
 [functions.flashscore-live]
 verify_jwt = false
 
 [functions.flashscore-today]
+verify_jwt = false
+
+[functions.sofascore-live]
+verify_jwt = false
+
+[functions.sofascore-today]
+verify_jwt = false
+
+[functions.fotmob-live]
+verify_jwt = false
+
+[functions.fotmob-today]
 verify_jwt = false
