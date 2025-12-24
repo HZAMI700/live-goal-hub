@@ -1,6 +1,7 @@
 /**
- * TheSportsDB API Service
- * Connects to edge functions that proxy TheSportsDB API
+ * Sports API Service
+ * Primary: Flashscore (via Firecrawl scraping)
+ * Fallback: TheSportsDB API
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -9,15 +10,30 @@ import { Match, League, MatchDetails } from "@/types/match";
 // API status tracking
 let apiStatus: "online" | "offline" | "loading" = "loading";
 let lastFetchTime: Date | null = null;
+let dataSource: "flashscore" | "thesportsdb" | null = null;
 
 export const getApiStatus = () => apiStatus;
 export const getLastFetchTime = () => lastFetchTime;
+export const getDataSource = () => dataSource;
 
 /**
- * Fetch live matches from TheSportsDB
+ * Fetch live matches - tries Flashscore first, falls back to TheSportsDB
  */
 export const fetchLiveMatches = async (): Promise<Match[]> => {
   try {
+    // Try Flashscore first
+    const { data: flashscoreData, error: flashscoreError } = await supabase.functions.invoke("flashscore-live");
+
+    if (!flashscoreError && flashscoreData?.matches?.length > 0) {
+      apiStatus = "online";
+      lastFetchTime = new Date();
+      dataSource = "flashscore";
+      console.log("Live matches from Flashscore:", flashscoreData.matches.length);
+      return flashscoreData.matches;
+    }
+
+    // Fallback to TheSportsDB
+    console.log("Falling back to TheSportsDB for live matches");
     const { data, error } = await supabase.functions.invoke("thesportsdb-live");
 
     if (error) {
@@ -28,6 +44,7 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
 
     apiStatus = "online";
     lastFetchTime = new Date();
+    dataSource = "thesportsdb";
     return data?.matches || [];
   } catch (error) {
     console.error("Failed to fetch live matches:", error);
@@ -37,13 +54,31 @@ export const fetchLiveMatches = async (): Promise<Match[]> => {
 };
 
 /**
- * Fetch today's matches from TheSportsDB
+ * Fetch today's matches - tries Flashscore first, falls back to TheSportsDB
  */
 export const fetchTodayMatches = async (date?: string): Promise<{
   topLeagues: League[];
   otherLeagues: League[];
 }> => {
   try {
+    // Try Flashscore first (only for today, not other dates)
+    if (!date || date === new Date().toISOString().split('T')[0]) {
+      const { data: flashscoreData, error: flashscoreError } = await supabase.functions.invoke("flashscore-today");
+
+      if (!flashscoreError && (flashscoreData?.topLeagues?.length > 0 || flashscoreData?.otherLeagues?.length > 0)) {
+        apiStatus = "online";
+        lastFetchTime = new Date();
+        dataSource = "flashscore";
+        console.log("Today matches from Flashscore:", flashscoreData.count);
+        return {
+          topLeagues: flashscoreData.topLeagues || [],
+          otherLeagues: flashscoreData.otherLeagues || [],
+        };
+      }
+    }
+
+    // Fallback to TheSportsDB
+    console.log("Falling back to TheSportsDB for today matches");
     const params = date ? { date } : undefined;
     const { data, error } = await supabase.functions.invoke("thesportsdb-today", {
       body: params,
@@ -57,6 +92,7 @@ export const fetchTodayMatches = async (date?: string): Promise<{
 
     apiStatus = "online";
     lastFetchTime = new Date();
+    dataSource = "thesportsdb";
     
     return {
       topLeagues: data?.topLeagues || [],
@@ -123,19 +159,30 @@ export const fetchMatchDetails = async (matchId: string): Promise<MatchDetails |
 /**
  * Check API health
  */
-export const checkApiHealth = async (): Promise<{ online: boolean }> => {
+export const checkApiHealth = async (): Promise<{ online: boolean; source: string | null }> => {
   try {
-    const { data, error } = await supabase.functions.invoke("thesportsdb-live");
+    // Try Flashscore first
+    const { error: flashscoreError } = await supabase.functions.invoke("flashscore-live");
     
-    if (error) {
-      apiStatus = "offline";
-      return { online: false };
+    if (!flashscoreError) {
+      apiStatus = "online";
+      dataSource = "flashscore";
+      return { online: true, source: "flashscore" };
     }
 
-    apiStatus = "online";
-    return { online: true };
+    // Try TheSportsDB
+    const { error } = await supabase.functions.invoke("thesportsdb-live");
+    
+    if (!error) {
+      apiStatus = "online";
+      dataSource = "thesportsdb";
+      return { online: true, source: "thesportsdb" };
+    }
+
+    apiStatus = "offline";
+    return { online: false, source: null };
   } catch {
     apiStatus = "offline";
-    return { online: false };
+    return { online: false, source: null };
   }
 };
